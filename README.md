@@ -1,6 +1,6 @@
 # Infrastructure as Code — Production Homelab / Multi-Site
 
-[![CI](https://img.shields.io/badge/CI-passing-brightgreen?style=flat-square)](./.github/workflows/ci.yml)
+[![CI](https://github.com/kohiodevp/infra-as-code/actions/workflows/ci.yml/badge.svg)](https://github.com/kohiodevp/infra-as-code/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-v1.0.0-informational.svg?style=flat-square)](./README.md)
 
@@ -276,8 +276,9 @@ couvrant les codes de retour `0/1/2/64`, les verrous, les seuils d'alerte, la
 gestion des variables vides, le **rollback de déploiement** et le **test de
 restauration** (y compris nettoyage du dossier temporaire).
 
-> Les badges en tête de page sont **statiques** tant que le dépôt n'a pas de
-> remote Git ; le workflow réel est le fichier `ci.yml` ci-dessus.
+> Le badge **CI** est celui du workflow réel
+> [`.github/workflows/ci.yml`](./.github/workflows/ci.yml), exécuté sur `main`
+> à chaque push/PR. La licence et la version restent des badges de gabarit.
 
 ---
 
