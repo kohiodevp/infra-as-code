@@ -1,0 +1,27 @@
+---
+# Role monitoring : exporteur de metriques de l'hote pour Prometheus.
+- name: Install the Prometheus node exporter
+  ansible.builtin.apt:
+    name: prometheus-node-exporter
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Enable the node exporter service
+  ansible.builtin.service:
+    name: prometheus-node-exporter
+    state: started
+    enabled: true
+
+- name: Install the realtime monitoring agent
+  ansible.builtin.apt:
+    name: netdata
+    state: present
+  when: monitoring_install_netdata | default(false) | bool
+
+- name: Enable the realtime monitoring agent service
+  ansible.builtin.service:
+    name: netdata
+    state: started
+    enabled: true
+  when: monitoring_install_netdata | default(false) | bool

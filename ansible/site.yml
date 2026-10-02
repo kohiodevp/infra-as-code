@@ -1,0 +1,39 @@
+---
+# Playbook principal : provisionne la plateforme de production en 6 roles.
+# Requis : inventaire fourni via -i, droits sudo sur la cible.
+# Usage :
+#   ansible-playbook -i ansible/inventories/production/hosts.yml \
+#     ansible/site.yml --ask-become-pass
+- name: Configure the production platform
+  hosts: all
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Check that the target host answers
+      ansible.builtin.ping:
+
+    - name: Show the provisioning start timestamp
+      ansible.builtin.debug:
+        msg: "Provisioning started at {{ ansible_date_time.iso8601 }}"
+      tags: [always]
+
+  roles:
+    - role: common
+      tags: [common]
+    - role: security
+      tags: [security]
+    - role: docker
+      tags: [docker]
+    - role: vpn
+      tags: [vpn]
+    - role: backup
+      tags: [backup]
+    - role: monitoring
+      tags: [monitoring]
+
+  post_tasks:
+    - name: Report the provisioning result
+      ansible.builtin.debug:
+        msg: "Provisioning completed on {{ inventory_hostname }}"
+      tags: [always]

@@ -1,0 +1,54 @@
+---
+# Role security : durcissement noyau et supervision des tentatives d'intrusion.
+# Le durcissement SSH est opt-in (security_sshd_hardening) pour ne jamais
+# couper l'acces d'une cle non encore installee.
+- name: Install the host hardening packages
+  ansible.builtin.apt:
+    name:
+      - auditd
+      - fail2ban
+      - nftables
+    state: present
+
+- name: Enable the kernel hardening settings
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-hardening.conf
+    content: |
+      net.ipv4.conf.all.rp_filter = 1
+      net.ipv4.conf.default.rp_filter = 1
+      net.ipv4.icmp_echo_ignore_broadcasts = 1
+      net.ipv4.conf.all.accept_redirects = 0
+      net.ipv4.conf.default.accept_redirects = 0
+      net.ipv4.tcp_syncookies = 1
+      net.ipv6.conf.all.accept_redirects = 0
+      fs.suid_dumpable = 0
+      kernel.kptr_restrict = 2
+    owner: root
+    group: root
+    mode: "0644"
+  register: security_sysctl
+
+- name: Apply the kernel hardening settings
+  ansible.builtin.command: sysctl --system
+  changed_when: security_sysctl is changed
+
+- name: Disable SSH password authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication no"
+    backup: true
+    validate: "/usr/sbin/sshd -t -f %s"
+  when: security_sshd_hardening | default(false) | bool
+
+- name: Enable the fail2ban intrusion detection service
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+
+- name: Enable the host firewall service
+  ansible.builtin.service:
+    name: nftables
+    state: started
+    enabled: true

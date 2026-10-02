@@ -1,0 +1,42 @@
+---
+# Role common : socle operateurs commun a tous les hotes de la plateforme.
+- name: Install the baseline operating system packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - chrony
+      - curl
+      - htop
+      - jq
+      - vim
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create the shared operations group
+  ansible.builtin.group:
+    name: ops
+    system: true
+    state: present
+
+- name: Set the system timezone
+  ansible.builtin.file:
+    src: "/usr/share/zoneinfo/{{ common_timezone | default('UTC') }}"
+    dest: /etc/localtime
+    state: link
+    force: true
+    mode: "0644"
+
+- name: Write the timezone name file
+  ansible.builtin.copy:
+    dest: /etc/timezone
+    content: "{{ common_timezone | default('UTC') }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable the NTP service
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: true

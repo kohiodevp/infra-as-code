@@ -1,0 +1,29 @@
+---
+# Role docker : moteur Docker + plugin Compose, groupe d'administration.
+- name: Install Docker Engine and the Compose plugin
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-compose
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create the docker administration group
+  ansible.builtin.group:
+    name: docker
+    system: true
+    state: present
+
+- name: Enable the Docker daemon at boot
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Add the administrative user to the docker group
+  ansible.builtin.user:
+    name: "{{ docker_admin_user }}"
+    groups: docker
+    append: true
+  when: docker_admin_user is defined

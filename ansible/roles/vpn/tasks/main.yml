@@ -1,0 +1,27 @@
+---
+# Role vpn : installation de WireGuard et activation de l'interface si elle
+# existe deja sur la cible (la generation des cles reste hors playbook).
+- name: Install WireGuard
+  ansible.builtin.apt:
+    name: wireguard
+    state: present
+
+- name: Create the WireGuard configuration directory
+  ansible.builtin.file:
+    path: /etc/wireguard
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Read the WireGuard interface configuration
+  ansible.builtin.stat:
+    path: "/etc/wireguard/{{ vpn_interface | default('wg0') }}.conf"
+  register: vpn_interface_config
+
+- name: Enable the WireGuard interface at boot
+  ansible.builtin.service:
+    name: "wg-quick@{{ vpn_interface | default('wg0') }}"
+    state: started
+    enabled: true
+  when: vpn_interface_config.stat.exists | bool

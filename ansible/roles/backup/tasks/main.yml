@@ -1,0 +1,35 @@
+---
+# Role backup : BorgBackup installe, depot local cree, tache planifiee.
+# La cadence et le script sont surchargeables sans editer ce role.
+- name: Install BorgBackup
+  ansible.builtin.apt:
+    name: borgbackup
+    state: present
+
+- name: Create the local backup repository parent directory
+  ansible.builtin.file:
+    path: "{{ backup_root | default('/var/backups/borg') }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Schedule the daily Borg backup
+  ansible.builtin.copy:
+    dest: /etc/cron.d/borg-backup
+    content: |
+      # Managed by ansible (role backup) - BorgBackup schedule.
+      {{ backup_cron_schedule | default('15 * * * *') }} root {{ backup_script | default('/opt/scripts/backup_borg.sh') }} >> /var/log/borg-backup.log 2>&1
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Restrict the backup log file permissions
+  ansible.builtin.file:
+    path: /var/log/borg-backup.log
+    state: touch
+    owner: root
+    group: root
+    mode: "0640"
+    modification_time: preserve
+    access_time: preserve
