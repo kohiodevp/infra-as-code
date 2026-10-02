@@ -22,7 +22,7 @@ services:
     container_name: infra-postgres
     restart: unless-stopped
     environment:
-      TZ: ${TZ:-Europe/Paris}
+      TZ: ${TZ:-Africa/Ouagadougou}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB manquant dans .env}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER manquant dans .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
@@ -58,7 +58,7 @@ services:
       - grafana
       - prometheus
     environment:
-      TZ: ${TZ:-Europe/Paris}
+      TZ: ${TZ:-Africa/Ouagadougou}
     ports:
       - '${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-80}:80'
       - '${HTTPS_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:443'
@@ -83,7 +83,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      TZ: ${TZ:-Europe/Paris}
+      TZ: ${TZ:-Africa/Ouagadougou}
       DB_SERVER_HOST: postgres
       DB_SERVER_PORT: '5432'
       POSTGRES_DB: ${ZABBIX_DB_NAME:?ZABBIX_DB_NAME manquant dans .env}
@@ -108,7 +108,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      TZ: ${TZ:-Europe/Paris}
+      TZ: ${TZ:-Africa/Ouagadougou}
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER manquant dans .env}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD manquant dans .env}
       GF_SECURITY_DISABLE_GRAVATAR: 'true'
@@ -176,7 +176,7 @@ services:
     restart: unless-stopped
     pid: host
     environment:
-      TZ: ${TZ:-Europe/Paris}
+      TZ: ${TZ:-Africa/Ouagadougou}
       NETDATA_DISABLE_TELEMETRY: ${NETDATA_DISABLE_TELEMETRY:-1}
     cap_add:
       - SYS_PTRACE
@@ -215,7 +215,7 @@ services:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
     environment:
-      TZ: ${TZ:-Europe/Paris}
+      TZ: ${TZ:-Africa/Ouagadougou}
       WG_HOST: ${WIREGUARD_HOST:?WIREGUARD_HOST manquant dans .env}
       WG_PORT: ${WIREGUARD_PORT:-51820}
       WG_DEFAULT_DNS: ${WIREGUARD_DNS:-1.1.1.1}
@@ -242,7 +242,7 @@ services:
     restart: unless-stopped
     command: server -config=/vault/config/vault.hcl
     environment:
-      TZ: ${TZ:-Europe/Paris}
+      TZ: ${TZ:-Africa/Ouagadougou}
       VAULT_ADDR: http://127.0.0.1:8200
       VAULT_API_ADDR: http://vault:8200
     ports:
