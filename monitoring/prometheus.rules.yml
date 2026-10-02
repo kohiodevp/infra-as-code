@@ -1,0 +1,56 @@
+groups:
+  - name: infra-stack
+    rules:
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cible Prometheus injoignable ({{ $labels.job }})"
+          description: "Le job {{ $labels.job }} n'est plus scrape depuis 5 minutes."
+
+      - alert: PrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Echec du rechargement de la configuration Prometheus"
+
+  - name: infra-hote
+    rules:
+      - alert: HoteDisquePresquePlein
+        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes < 0.10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disque a moins de 10% de liberte sur {{ $labels.instance }}"
+          description: "Montpoint {{ $labels.mountpoint }} : il reste {{ $value | humanizePercentage }}."
+
+      - alert: HoteMemoireSaturee
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.05
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Memoire disponible sous 5% sur {{ $labels.instance }}"
+
+  - name: infra-services
+    rules:
+      - alert: GrafanaIndisponible
+        expr: up{job="grafana"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Grafana ne repond plus"
+
+      - alert: NetdataIndisponible
+        expr: up{job="netdata"} == 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Netdata ne repond plus"

@@ -1,0 +1,281 @@
+# =============================================================================
+# infra-as-code — Stack de production (Docker Compose v2, sans schema "version")
+#
+# 8 services, 3 reseaux isoles :
+#   edge    -> seuls conteneurs avec ports publies (loopback par defaut)
+#   backend -> bus inter-services, aucun port publie, acces sortant conserve
+#              (SMTP d'alerte, installation de plugins Grafana)
+#   data    -> interne pur (internal: true), uniquement PostgreSQL et ses clients
+#
+# Toutes les variables sont definies dans .env.example (copie vers .env).
+# Validation : docker compose config -q   (execute par la CI)
+# =============================================================================
+
+name: infra-stack
+
+services:
+  # ---------------------------------------------------------------------------
+  # Couche data — PostgreSQL 16 (sabot de donnees, aucun port publie)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: infra-postgres
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB manquant dans .env}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER manquant dans .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+      # Passees aux scripts de /docker-entrypoint-initdb.d (premier demarrage)
+      ZABBIX_DB_NAME: ${ZABBIX_DB_NAME:?ZABBIX_DB_NAME manquant dans .env}
+      ZABBIX_DB_USER: ${ZABBIX_DB_USER:?ZABBIX_DB_USER manquant dans .env}
+      ZABBIX_DB_PASSWORD: ${ZABBIX_DB_PASSWORD:?ZABBIX_DB_PASSWORD manquant dans .env}
+      GRAFANA_DB_NAME: ${GRAFANA_DB_NAME:?GRAFANA_DB_NAME manquant dans .env}
+      GRAFANA_DB_USER: ${GRAFANA_DB_USER:?GRAFANA_DB_USER manquant dans .env}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:?GRAFANA_DB_PASSWORD manquant dans .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # Couche edge — Nginx Proxy Manager (80/443 publics, 81 en loopback)
+  # ---------------------------------------------------------------------------
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:2.16.0
+    container_name: infra-nginx-proxy-manager
+    restart: unless-stopped
+    depends_on:
+      - grafana
+      - prometheus
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+    ports:
+      - '${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-80}:80'
+      - '${HTTPS_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:443'
+      - '${NGINX_PM_ADMIN_BIND:-127.0.0.1}:${NGINX_PM_ADMIN_PORT:-81}:81'
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+    networks:
+      - edge
+      - backend
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # Couche data — Zabbix server 7.0 (collecte, base "zabbix" auto-initialisee)
+  # ---------------------------------------------------------------------------
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql:7.0.31-alpine
+    container_name: infra-zabbix-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      DB_SERVER_HOST: postgres
+      DB_SERVER_PORT: '5432'
+      POSTGRES_DB: ${ZABBIX_DB_NAME:?ZABBIX_DB_NAME manquant dans .env}
+      POSTGRES_USER: ${ZABBIX_DB_USER:?ZABBIX_DB_USER manquant dans .env}
+      POSTGRES_PASSWORD: ${ZABBIX_DB_PASSWORD:?ZABBIX_DB_PASSWORD manquant dans .env}
+    ports:
+      - '${ZABBIX_BIND:-127.0.0.1}:${ZABBIX_SERVER_PORT:-10051}:10051'
+    networks:
+      - backend
+      - data
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # Couche data — Grafana (UI d'observation, base PostgreSQL dediee)
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.6.16
+    container_name: infra-grafana
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER manquant dans .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD manquant dans .env}
+      GF_SECURITY_DISABLE_GRAVATAR: 'true'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_DATABASE_TYPE: postgres
+      GF_DATABASE_HOST: postgres:5432
+      GF_DATABASE_NAME: ${GRAFANA_DB_NAME:?GRAFANA_DB_NAME manquant dans .env}
+      GF_DATABASE_USER: ${GRAFANA_DB_USER:?GRAFANA_DB_USER manquant dans .env}
+      GF_DATABASE_PASSWORD: ${GRAFANA_DB_PASSWORD:?GRAFANA_DB_PASSWORD manquant dans .env}
+      # "-" (sans deux-points) : laisser vide dans .env desactive l'installation
+      GF_INSTALL_PLUGINS: ${GF_INSTALL_PLUGINS-grafana-zabbix-datasource}
+    ports:
+      - '${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000'
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - edge
+      - backend
+      - data
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://localhost:3000/api/health || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # Couche backend — Prometheus (scrape + regles d'alerte)
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    container_name: infra-prometheus
+    restart: unless-stopped
+    environment:
+      PROMETHEUS_SCRAPE_INTERVAL: ${PROMETHEUS_SCRAPE_INTERVAL:-15s}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --config.expand-env=true
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --storage.tsdb.retention.size=10GB
+      - --web.enable-lifecycle
+    ports:
+      - '${PROMETHEUS_BIND:-127.0.0.1}:${PROMETHEUS_PORT:-9090}:9090'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus.rules.yml:/etc/prometheus/rules.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - edge
+      - backend
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # Couche backend — Netdata (metrique temps reel de l'hote et des conteneurs)
+  # ---------------------------------------------------------------------------
+  netdata:
+    image: netdata/netdata:v2.12.0
+    container_name: infra-netdata
+    restart: unless-stopped
+    pid: host
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      NETDATA_DISABLE_TELEMETRY: ${NETDATA_DISABLE_TELEMETRY:-1}
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+      - PERFMON
+    ports:
+      - '${NETDATA_BIND:-127.0.0.1}:${NETDATA_PORT:-19999}:19999'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
+      - netdata_config:/etc/netdata
+      - netdata_cache:/var/cache/netdata
+      - netdata_lib:/var/lib/netdata
+    networks:
+      - edge
+      - backend
+    security_opt:
+      # Requis par Netdata pour inspecter /proc et les cgroups des autres
+      # processus de l'hote (cf. documentation officielle Netdata).
+      - apparmor:unconfined
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # Couche edge — WireGuard / wg-easy (acces distant au reseau interne)
+  # ---------------------------------------------------------------------------
+  wireguard:
+    image: ghcr.io/wg-easy/wg-easy:14
+    container_name: infra-wireguard
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      WG_HOST: ${WIREGUARD_HOST:?WIREGUARD_HOST manquant dans .env}
+      WG_PORT: ${WIREGUARD_PORT:-51820}
+      WG_DEFAULT_DNS: ${WIREGUARD_DNS:-1.1.1.1}
+      WG_DEFAULT_ALLOWED_IPS: ${WIREGUARD_ALLOWED_IPS:-0.0.0.0/0}
+      # wg-easy v14 n'accepte que le hash bcrypt (voir .env.example)
+      PASSWORD_HASH: ${WIREGUARD_PASSWORD_HASH:?WIREGUARD_PASSWORD_HASH manquant dans .env}
+    ports:
+      - '${WIREGUARD_BIND:-0.0.0.0}:${WIREGUARD_PORT:-51820}:51820/udp'
+      - '${WIREGUARD_UI_BIND:-127.0.0.1}:${WIREGUARD_UI_PORT:-51821}:51821/tcp'
+    volumes:
+      - wireguard_data:/etc/wireguard
+    networks:
+      - edge
+      - backend
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------------------------------------------------------------------------
+  # Couche backend — HashiCorp Vault (maitrise des secrets, stockage fichier)
+  # ---------------------------------------------------------------------------
+  vault:
+    image: hashicorp/vault:1.19.5
+    container_name: infra-vault
+    restart: unless-stopped
+    command: server -config=/vault/config/vault.hcl
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      VAULT_ADDR: http://127.0.0.1:8200
+      VAULT_API_ADDR: http://vault:8200
+    ports:
+      - '${VAULT_BIND:-127.0.0.1}:${VAULT_PORT:-8200}:8200'
+    volumes:
+      - ./vault/config/vault.hcl:/vault/config/vault.hcl:ro
+      - vault_data:/vault/data
+    networks:
+      - edge
+      - backend
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  # Ports publies : entree du stack (HTTP/HTTPS, UDP WireGuard, debug loopback)
+  edge:
+    driver: bridge
+  # Bus inter-services : aucun port publie vers l'exterieur de la machine
+  backend:
+    driver: bridge
+  # Donnees : aucun acces sortant, aucun port publie (PostgreSQL only)
+  data:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres_data:
+  grafana_data:
+  prometheus_data:
+  npm_data:
+  npm_letsencrypt:
+  netdata_config:
+  netdata_cache:
+  netdata_lib:
+  wireguard_data:
+  vault_data:

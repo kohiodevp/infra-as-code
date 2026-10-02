@@ -2,6 +2,7 @@
 .env
 *.vault
 vault.yml
+!ansible/vault.yml
 *.key
 *.pem
 *.p12

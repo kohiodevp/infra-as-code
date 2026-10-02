@@ -1,0 +1,8 @@
+---
+# Configuration ansible-lint utilisee par la CI (.github/workflows/ci.yml).
+# Reproduire localement : ansible-lint ansible/
+profile: production
+exclude_paths:
+  - .github/
+  - .git/
+  - git_workspace/
