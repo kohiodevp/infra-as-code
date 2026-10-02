@@ -8,7 +8,7 @@ doit être rattachée à une couche avant d'être validée.
 
 ## 0. Vue d'ensemble
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ COUCHE 4 — OBSERVABILITÉ & SUPERVISION                                      │
 │   Zabbix (collecte/événements) · Grafana (restitution) · Netdata (temps réel) │
@@ -24,7 +24,7 @@ doit être rattachée à une couche avant d'être validée.
 │ COUCHE 1 — INFRASTRUCTURE PHYSIQUE & VIRTUELLE                              │
 │   VPS KVM Debian 12 · LVM · BorgBackup                                      │
 └──────────────────────────────────────────────────────────────────────────────┘
-```
+```text
 
 Règle de lecture : **une couche ne consomme que les services de la couche
 inférieure** (dépendances descendantes). Une couche ne doit jamais être contournée :
@@ -34,7 +34,7 @@ de la couche 1 sans passer par la plateforme (couche 2).
 Légende d'état utilisée dans ce document :
 
 | Symbole | Signification |
-|---|---|
+| --- | --- |
 | ✅ | Déployé dans `docker-compose.yml` de ce dépôt |
 | 🟡 | Prévu / décrit ici, mais pas encore déployé |
 | 🔵 | Géré par un autre dépôt ou directement sur l'hôte |
@@ -46,14 +46,15 @@ Légende d'état utilisée dans ce document :
 **Question à laquelle elle répond :** *sur quoi est-ce que tout le reste tourne ?*
 
 | Élément | Rôle | État |
-|---|---|---|
+| --- | --- | --- |
 | VPS KVM (Debian 12) | Machine hôte unique, kernel maîtrisé, virtualisation KVM côté fournisseur | 🔵 |
 | LVM | Partitionnement : `/` (système), `vg_data` (données Docker/bases), découpage possible sans redémarrage | 🔵 |
 | BorgBackup | Sauvegarde dédupliquée, chiffrée, hors-machine ; rétention 7 journalières / 4 hebdomadaires / 12 mensuelles (1 an d'historique) — `--keep-daily 7 --keep-weekly 4 --keep-monthly 12` | 🔵 |
-| `scripts/backup_borg.sh`, `scripts/restore_test.sh` | Création des repos et **tests de restauration** périodiques | 🟡 |
+| `scripts/backup_borg.sh`, `scripts/restore_test.sh` | Création des repos et **tests de restauration** périodiques | ✅ |
 | `ansible/roles/backup` | Installation et paramétrage de BorgBackup | 🟡 |
 
 **Invariants de couche :**
+
 - Aucun secret de couche 2+ n'est stocké en clair sur les volumes de la couche 1
   (chiffrement au repos LVM/Borg).
 - La sauvegarde n'est valide que si un **test de restauration** a réussi
@@ -68,7 +69,7 @@ Légende d'état utilisée dans ce document :
 isolées, exposées et protégées ?*
 
 | Élément | Rôle | État |
-|---|---|---|
+| --- | --- | --- |
 | Docker Compose (`docker-compose.yml`) | Orchestration locale du stack, 8 services, volumes persistants | ✅ |
 | Réseau `edge` | Seule zone avec ports publiés (80/443, 51820/UDP) | ✅ |
 | Réseau `backend` | Bus inter-services, **aucun port publié**, accès sortant conservé | ✅ |
@@ -80,6 +81,7 @@ isolées, exposées et protégées ?*
 | `ansible/roles/{security,vpn,docker}` | Durcissement, déploiement VPN, installation Docker | 🟡 |
 
 **Invariants de couche :**
+
 - Les seules entrées publiques de la machine sont **SSH, 80, 443, 51820/UDP**.
 - Toute interface d'administration est publiée sur `127.0.0.1` (Grafana, NPM,
   Prometheus, Netdata, Vault, Zabbix, wg-easy) : accès par tunnel SSH uniquement.
@@ -89,12 +91,12 @@ isolées, exposées et protégées ?*
 
 **Frontière de confiance :**
 
-```
+```text
 Internet ──► nftables ──► edge ──► backend ──► data
   (80/443,      (filtre)   (NPM,     (services)  (PostgreSQL)
    51820/UDP)              WG,
                           Grafana…)
-```
+```text
 
 ---
 
@@ -103,7 +105,7 @@ Internet ──► nftables ──► edge ──► backend ──► data
 **Question à laquelle elle répond :** *quel service est délivré à l'utilisateur final ?*
 
 | Élément | Rôle | État |
-|---|---|---|
+| --- | --- | --- |
 | Nginx Proxy Manager | Reverse proxy, termination TLS, certs Let's Encrypt | ✅ |
 | Grafana | Portail d'observation (UI unique pour les métriques) | ✅ |
 | Mail (SMTP sortant) | Notification d'alertes, transactionnel | 🟡 |
@@ -112,6 +114,7 @@ Internet ──► nftables ──► edge ──► backend ──► data
 | Geo FastAPI | API géospatiale consommée par `geo-android-offline` | 🔵 (dépôt dédié) |
 
 **Invariants de couche :**
+
 - Tout service exposé publiquement passe **obligatoirement** par Nginx Proxy
   Manager ; aucune application ne publie de port 80/443 elle-même.
 - Les applications ne détiennent pas les credentials de la couche de données :
@@ -127,7 +130,7 @@ Internet ──► nftables ──► edge ──► backend ──► data
 comment réagissons-nous quand ça ne va pas ?*
 
 | Élément | Rôle | Granularité | État |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Netdata | Métriques temps réel (hôte, process, conteneurs) | seconde | ✅ |
 | Prometheus | Scraping, agrégation, règles d'alerte, rétention | 15 s | ✅ |
 | Grafana | Restitution, tableaux de bord, corrélation | — | ✅ |
@@ -138,7 +141,7 @@ comment réagissons-nous quand ça ne va pas ?*
 **Répartition des responsabilités (ne pas dupliquer) :**
 
 | Besoin | Outil de référence | Secondaire |
-|---|---|---|
+| --- | --- | --- |
 | Métriques système / conteneurs | Netdata → Prometheus | — |
 | Métriques applicatives | Prometheus | — |
 | Restitution & dashboards | **Grafana** | — |
@@ -146,6 +149,7 @@ comment réagissons-nous quand ça ne va pas ?*
 | Notification d'incident | Zabbix actions / Alertmanager | Mail (couche 3) |
 
 **Invariants de couche :**
+
 - Grafana est l'**unique** point de restitution pour un opérateur ; on n'ouvre pas
   l'UI Prometheus en production.
 - Toute alerte critique a un runbook dans `docs/PROCEDURES.md`.
@@ -154,19 +158,19 @@ comment réagissons-nous quand ça ne va pas ?*
 
 **Flux de données :**
 
-```
+```text
 hôte / conteneurs ──► Netdata ──────────────┐
 hôte / conteneurs ──► Prometheus (scrape) ──┼──► Grafana (restitution)
                                              └──► Alertmanager 🟡 ──► Mail/Slack
 hôtes (agents) ─────► Zabbix server ──► base zabbix ──► Zabbix web 🟡 ──► escalade
-```
+```text
 
 ---
 
 ## 5. Cartographie dépôt → couche
 
 | Chemin du dépôt | Couche |
-|---|---|
+| --- | --- |
 | `docker-compose.yml`, `vault/`, `docker/` | 2 (+4 pour la stack d'obs.) |
 | `.github/workflows/ci.yml`, `.ansible-lint` | transverse (qualité) |
 | `ansible/roles/{common,docker,security,vpn,backup}` | 1 et 2 |
@@ -223,8 +227,11 @@ production réelle :
    d'alertes Prometheus actuellement non configuré).
 3. **SMTP sortant** non configuré : les notifications Zabbix/Grafana ne peuvent
    pas encore être émises.
-4. **nftables / VLAN / LVM / BorgBackup** sont de la couche 1-2 opérée en dehors
-   de Docker : ansible (`ansible/roles/*`) et `scripts/` les couvrent, à écrire.
+4. **nftables / VLAN / LVM** sont de la couche 1-2 opérée en dehors de Docker :
+   ansible (`ansible/roles/*`, squelettes vides) doit les couvrir, à écrire. Les
+   scripts d'exploitation associés existent (`backup_borg.sh`, `restore_test.sh`,
+   `wg_watchdog.sh`, `healthcheck_all.sh`, `deploy_service.sh`) mais ne sont pas
+   encore branchés en cron ni supervisés par Zabbix.
 5. **Vault** : activer l'auto-unseal et le TLS côté listener avant d'y stocker des
    secrets de production.
 6. **Netdata** s'exécute avec `pid: host`, `SYS_ADMIN` et `apparmor:unconfined`
@@ -239,7 +246,7 @@ La conformité de cette architecture est vérifiée à chaque push/PR sur `main`
 `develop` par `.github/workflows/ci.yml` :
 
 | Étape | Outil | Ce qu'elle protège |
-|---|---|---|
+| --- | --- | --- |
 | Lint Ansible | `ansible-lint` (profil `production`) | Cohérence et sécurité des playbooks/roles |
 | Lint shell | `shellcheck` sur `scripts/*.sh` | Fiabilité des scripts d'exploitation |
 | Validation Compose | `docker compose config -q` | Compose valide + `.env.example` complet |
@@ -248,6 +255,6 @@ Reproduire localement :
 
 ```bash
 ansible-lint ansible/
-shellcheck scripts/*.sh
+shellcheck --severity=style scripts/*.sh
 cp .env.example .env && docker compose config -q
-```
+```text

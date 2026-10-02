@@ -271,8 +271,10 @@ cp .env.example .env && docker compose config -q
 ```
 
 Les scripts d'exploitation ont été validés par un banc d'essai à stubs (`borg`,
-`ping`, `docker`, `ip`, `wg`) : séquences d'appel, codes de retour `0/1/2`,
-verrous, seuils d'alerte et gestion des variables vides.
+`ping`, `docker`, `ip`, `wg`) et une pile Compose jetable : 130 assertions
+couvrant les codes de retour `0/1/2/64`, les verrous, les seuils d'alerte, la
+gestion des variables vides, le **rollback de déploiement** et le **test de
+restauration** (y compris nettoyage du dossier temporaire).
 
 > Les badges en tête de page sont **statiques** tant que le dépôt n'a pas de
 > remote Git ; le workflow réel est le fichier `ci.yml` ci-dessus.
@@ -284,17 +286,17 @@ verrous, seuils d'alerte et gestion des variables vides.
 | Document | Objet | État |
 | --- | --- | --- |
 | [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Modèle à 4 couches, ADR-001 à ADR-005, écarts connus | Rédigé |
-| [`docs/DEPLOIEMENT.md`](./docs/DEPLOIEMENT.md) | Procédure de mise en production pas à pas | À rédiger |
-| [`docs/PROCEDURES.md`](./docs/PROCEDURES.md) | Runbooks d'exploitation par alerte | À rédiger |
-| [`docs/RESTAURATION.md`](./docs/RESTAURATION.md) | Procédure de restauration et de test PRA | À rédiger |
-| [`docs/SECURITE.md`](./docs/SECURITE.md) | Durcissement, rotation des secrets, revue d'accès | À rédiger |
+| [`docs/DEPLOIEMENT.md`](./docs/DEPLOIEMENT.md) | Procédure de mise en production pas à pas | Rédigé |
+| [`docs/PROCEDURES.md`](./docs/PROCEDURES.md) | Runbooks d'exploitation par alerte | Rédigé |
+| [`docs/RESTAURATION.md`](./docs/RESTAURATION.md) | Procédure de restauration et de test PRA | Rédigé |
+| [`docs/SECURITE.md`](./docs/SECURITE.md) | Durcissement, rotation des secrets, revue d'accès | Rédigé |
 | [`docs/ARCHITECTURE.md` §7](./docs/ARCHITECTURE.md) | Écarts assumés : frontend Zabbix, Alertmanager, SMTP, nftables/VLAN/LVM | Suivi |
 
 Prochaines étapes (dans l'ordre) :
 
 1. Réaliser `ansible/site.yml` et les 6 rôles (inventories `production` /
    `staging` déjà en place) ;
-2. Rédiger les 4 documents d'exploitation restants ;
+2. ~~Rédiger les 4 documents d'exploitation restants~~ (fait : `DEPLOIEMENT`, `PROCEDURES`, `RESTAURATION`, `SECURITE`) ;
 3. Ajouter `zabbix-web-nginx-pgsql` (frontend + API Grafana) et Alertmanager ;
 4. Brancher `backup_borg.sh` et `wg_watchdog.sh` sur cron avec alerting Zabbix ;
 5. Activer auto-unseal et TLS sur Vault avant d'y placer des secrets de production.

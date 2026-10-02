@@ -5,7 +5,7 @@ umask 077
 PROG="${0##*/}"
 BORG_BIN="${BORG_BIN:-borg}"
 
-BORG_REPO="${BORG_REPO-/var/backups/borg/repo}"
+export BORG_REPO="${BORG_REPO-/var/backups/borg/repo}"
 BORG_PREFIX="${BORG_PREFIX-infra}"
 BORG_ENCRYPTION="${BORG_ENCRYPTION-repokey-blake2}"
 BORG_COMPRESSION="${BORG_COMPRESSION-auto,zstd,6}"
