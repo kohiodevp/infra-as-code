@@ -1,0 +1,29 @@
+# Secrets & environnement
+.env
+*.vault
+vault.yml
+*.key
+*.pem
+*.p12
+secrets/
+
+# Logs & sauvegardes
+*.log
+*.bak
+*.tmp
+*.swp
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Ansible
+*.retry
+
+# OS / Éditeurs
+.DS_Store
+.idea/
+.vscode/
