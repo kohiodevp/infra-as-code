@@ -1,0 +1,14 @@
+# Ansible Vault — Variables de configuration sensibles
+# ⚠️ NE JAMAIS commit ce fichier en clair.
+# Ce fichier doit être maintenu en local et ajouté à .gitignore.
+#
+# Format Ansible Vault (chiffré) :
+# !ANSIBLE_VAULT!1.1;AES256
+# ...
+#
+# Exemple de variables à y stocker (après chiffrement) :
+vault_db_password: "votre_mdp_bdd_ici"
+vault_api_key: "votre_cle_api_ici"
+vault_admin_token: "votre_token_admin_ici"
+vault_ssh_private_key: "-----BEGIN OPENSSH PRIVATE KEY-----
+..."
